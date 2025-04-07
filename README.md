@@ -38,7 +38,7 @@ Many players are left waiting for a host because Schedule I cannot be played wit
 18. In the **Audience** section, click **Add users** and paste your friends' emails one by one.
 19. Return to your project's main page and copy your **Project ID**.
 
-20. Download the latest release of **Schedule-I-Save-Sync** and unpack it.
+20. [Download the latest release of **Schedule-I-Save-Sync**](https://github.com/RRRiderrr/Schedule-I-Save-Sync/releases/tag/Release) and unpack it.
 21. Launch and close `ScheduleISync.exe`.
 22. Open the generated `GCloudConsoleConfig.json` file and fill in the required fields with the previously copied variables.
 23. Launch `ScheduleISync.exe` again and try to **Sign In**. If everything is configured correctly, you will be able to log in.
@@ -87,7 +87,7 @@ Many players are left waiting for a host because Schedule I cannot be played wit
 
 ## Part II. Client-side Setup
 
-1. Download the latest release of **Schedule-I-Save-Sync** and unpack it.
+1. [Download the latest release of **Schedule-I-Save-Sync**](https://github.com/RRRiderrr/Schedule-I-Save-Sync/releases/tag/Release) and unpack it.
 2. Place the `GCloudConsoleConfig.json` file in the same folder as `ScheduleISync.exe`.
 3. Launch `ScheduleISync.exe`.
 4. Sign in.

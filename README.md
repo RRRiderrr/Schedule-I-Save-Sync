@@ -63,8 +63,8 @@ Many players are left waiting for a host because Schedule I cannot be played wit
       while (files.hasNext()) {
         var file = files.next();
         var fileName = file.getName();
-        var fileUrl = file.getUrl(); // URL for viewing/downloading the file
-        var dateTime = file.getLastUpdated(); // You can use file.getDateCreated() if needed
+        var fileUrl = file.getUrl(); 
+        var dateTime = file.getLastUpdated(); 
         var ownerEmail = "";
         try {
           ownerEmail = file.getOwner().getEmail();

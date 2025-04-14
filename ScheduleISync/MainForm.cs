@@ -1,4 +1,5 @@
-﻿using System;
+﻿// File: MainForm.cs
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -18,30 +19,23 @@ using Google.Apis.Util.Store;
 using CsvHelper;
 using CsvHelper.Configuration.Attributes;
 using Newtonsoft.Json;
-using System.Globalization; // For CsvHelper
 
 namespace ScheduleISync
 {
     public partial class MainForm : Form
     {
-        private GCloudConsoleConfig gcloudConfig;   // Loaded from GCloudConsoleConfig.json
-        private UserSettings userSettings;          // Settings: SteamID, FolderLink, SheetLink, SelectedSlot, LastUsedAccount
-        private AccountInfo currentAccount = null;  // Only one account is supported – sign in via button
+        private GCloudConsoleConfig gcloudConfig;
+        private UserSettings userSettings;
+        private AccountInfo currentAccount = null;
         private readonly string appName = "ScheduleISync";
 
-        // Timer for checking if the game is running (every 5 seconds)
         private System.Windows.Forms.Timer processCheckTimer;
 
-        // Local save path based on SteamID
         private string LocalSavesPath
         {
             get
             {
-                string steamId = string.Empty;
-                if (this.IsHandleCreated)
-                    this.Invoke(new Action(() => { steamId = textBoxSteamID.Text.Trim(); }));
-                else
-                    steamId = textBoxSteamID.Text.Trim();
+                string steamId = textBoxSteamID.Text.Trim();
                 if (string.IsNullOrEmpty(steamId))
                     return "";
                 return Path.Combine(
@@ -55,20 +49,18 @@ namespace ScheduleISync
         public MainForm()
         {
             InitializeComponent();
-
-            // Set avatar in upper right corner (see Designer)
-            // Subscribe to Load event
             this.Load += MainForm_Load;
 
-            // Fill ComboBox with slots
-            comboBoxSlot.Items.AddRange(new string[] { "SaveGame_1", "SaveGame_2", "SaveGame_3", "SaveGame_4", "SaveGame_5" });
+            comboBoxSlot.Items.AddRange(new string[] {
+                "SaveGame_1","SaveGame_2","SaveGame_3","SaveGame_4","SaveGame_5"
+            });
+
             userSettings = UserSettingsManager.LoadSettings();
             if (!string.IsNullOrEmpty(userSettings.SelectedSlot))
                 comboBoxSlot.SelectedItem = userSettings.SelectedSlot;
             else
                 comboBoxSlot.SelectedIndex = 0;
 
-            // Start timer to check if the game is running (every 5 seconds)
             processCheckTimer = new System.Windows.Forms.Timer();
             processCheckTimer.Interval = 5000;
             processCheckTimer.Tick += ProcessCheckTimer_Tick;
@@ -82,20 +74,21 @@ namespace ScheduleISync
             gcloudConfig = GCloudConsoleConfig.LoadConfig();
             if (gcloudConfig == null)
             {
-                MessageBox.Show("GCloudConsoleConfig.json file is missing or empty. Please fill it in and restart the application.",
-                    "Configuration Error", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    "GCloudConsoleConfig.json file is missing or empty. Please fill it in and restart the application.",
+                    "Configuration Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
                 Environment.Exit(0);
             }
 
             userSettings = UserSettingsManager.LoadSettings();
-            this.Invoke(new Action(() =>
-            {
-                textBoxSteamID.Text = userSettings.SteamID;
-                textBoxFolderLink.Text = userSettings.FolderLink ?? "";
-                textBoxSheetLink.Text = userSettings.SheetLink ?? "";
-                if (!string.IsNullOrEmpty(userSettings.SelectedSlot))
-                    comboBoxSlot.SelectedItem = userSettings.SelectedSlot;
-            }));
+            textBoxSteamID.Text = userSettings.SteamID;
+            textBoxFolderLink.Text = userSettings.FolderLink ?? "";
+            textBoxSheetLink.Text = userSettings.SheetLink ?? "";
+            if (!string.IsNullOrEmpty(userSettings.SelectedSlot))
+                comboBoxSlot.SelectedItem = userSettings.SelectedSlot;
 
             UpdateUIState();
         }
@@ -110,12 +103,12 @@ namespace ScheduleISync
             base.OnFormClosing(e);
         }
 
-        // Block UI if the game is running
         private void UpdateUIState()
         {
             bool gameRunning = IsGameRunning();
             bool enableUI = (currentAccount != null) && !gameRunning;
-            Action updateAction = () =>
+
+            Action act = () =>
             {
                 buttonSignIn.Enabled = !enableUI;
                 textBoxSteamID.Enabled = enableUI;
@@ -126,19 +119,15 @@ namespace ScheduleISync
                 buttonDownload.Enabled = enableUI;
             };
 
-            if (this.IsHandleCreated)
-                this.Invoke(updateAction);
-            else
-                updateAction();
+            if (InvokeRequired) Invoke(act);
+            else act();
         }
 
-        // Check if the game (process "Schedule I") is running
         private bool IsGameRunning()
         {
             try
             {
-                var processes = Process.GetProcessesByName("Schedule I");
-                return processes.Length > 0;
+                return Process.GetProcessesByName("Schedule I").Length > 0;
             }
             catch
             {
@@ -151,12 +140,11 @@ namespace ScheduleISync
             Task.Run(() => UpdateUIState());
         }
 
-        // Update progress display (progress bar and label) on the same line
         private void UpdateProgress(string message, int percent)
         {
-            if (this.InvokeRequired)
+            if (InvokeRequired)
             {
-                this.Invoke(new Action(() =>
+                Invoke(new Action(() =>
                 {
                     labelProgress.Text = message;
                     progressBarStatus.Value = Math.Min(percent, progressBarStatus.Maximum);
@@ -169,7 +157,6 @@ namespace ScheduleISync
             }
         }
 
-        // Simplified logging for non-progress messages
         private void Log(string message)
         {
             if (textBoxLog.InvokeRequired)
@@ -178,25 +165,21 @@ namespace ScheduleISync
                 textBoxLog.AppendText(message + Environment.NewLine);
         }
 
-        // Sign in button click
         private async void buttonSignIn_Click(object sender, EventArgs e)
         {
             await SignInAsync();
         }
 
-        // Upload button click – uploads local save file to Google Drive
-        private void buttonUpload_Click(object sender, EventArgs e)
+        private async void buttonUpload_Click(object sender, EventArgs e)
         {
-            Task.Run(() => UploadSaveAsync());
+            await UploadSaveAsync();
         }
 
-        // Download button click – downloads save file using data from Google Sheet
-        private void buttonDownload_Click(object sender, EventArgs e)
+        private async void buttonDownload_Click(object sender, EventArgs e)
         {
-            Task.Run(() => DownloadFromSheetAsync());
+            await DownloadFromSheetAsync();
         }
 
-        // Sign in using Google Drive API
         private async Task SignInAsync()
         {
             try
@@ -213,12 +196,11 @@ namespace ScheduleISync
     ""redirect_uris"": [ ""urn:ietf:wg:oauth:2.0:oob"", ""http://localhost"" ]
   }
 }";
-                byte[] bytes = System.Text.Encoding.UTF8.GetBytes(oauthJson);
-                using (var ms = new MemoryStream(bytes))
+                using (var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(oauthJson)))
                 {
-                    var clientSecrets = GoogleClientSecrets.FromStream(ms).Secrets;
+                    var secrets = GoogleClientSecrets.FromStream(ms).Secrets;
                     var credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-                        clientSecrets,
+                        secrets,
                         new[] { DriveService.Scope.DriveFile },
                         storeKey,
                         CancellationToken.None,
@@ -229,32 +211,25 @@ namespace ScheduleISync
                         HttpClientInitializer = credential,
                         ApplicationName = appName
                     });
-                    var aboutRequest = service.About.Get();
-                    aboutRequest.Fields = "user(emailAddress,photoLink)";
-                    var about = aboutRequest.Execute();
-                    string email = about.User.EmailAddress;
-                    string photoLink = about.User.PhotoLink;
-                    Log("Signed in as " + email);
+
+                    var about = service.About.Get();
+                    about.Fields = "user(emailAddress,photoLink)";
+                    var info = about.Execute();
 
                     currentAccount = new AccountInfo
                     {
                         StoreKey = storeKey,
-                        Email = email,
+                        Email = info.User.EmailAddress,
                         Service = service,
-                        AvatarUrl = photoLink
+                        AvatarUrl = info.User.PhotoLink
                     };
-
                     userSettings.LastUsedAccount = storeKey;
                     UserSettingsManager.SaveSettings(userSettings);
 
-                    await UpdateAvatarAsync(photoLink);
+                    Log("Signed in as " + info.User.EmailAddress);
+                    await UpdateAvatarAsync(info.User.PhotoLink);
+                    buttonSignIn.Visible = false;
                     UpdateUIState();
-
-                    // Hide Sign In button after successful sign in
-                    if (this.InvokeRequired)
-                        this.Invoke(new Action(() => { buttonSignIn.Visible = false; }));
-                    else
-                        buttonSignIn.Visible = false;
                 }
             }
             catch (Exception ex)
@@ -263,30 +238,23 @@ namespace ScheduleISync
             }
         }
 
-        // Download avatar and crop to circle
         private async Task UpdateAvatarAsync(string imageUrl)
         {
             try
             {
                 if (string.IsNullOrEmpty(imageUrl))
                 {
-                    if (this.IsHandleCreated)
-                        this.Invoke(new Action(() => pictureBoxAvatar.Image = null));
-                    else
-                        pictureBoxAvatar.Image = null;
+                    pictureBoxAvatar.Image = null;
                     return;
                 }
-                using (WebClient wc = new WebClient())
+                using (var wc = new WebClient())
                 {
-                    byte[] data = await wc.DownloadDataTaskAsync(imageUrl);
-                    using (var mem = new MemoryStream(data))
+                    var data = await wc.DownloadDataTaskAsync(imageUrl);
+                    using (var ms = new MemoryStream(data))
                     {
-                        Image src = Image.FromStream(mem);
-                        var circle = CropToCircle(src, pictureBoxAvatar.Width, this.BackColor);
-                        if (this.IsHandleCreated)
-                            this.Invoke(new Action(() => pictureBoxAvatar.Image = circle));
-                        else
-                            pictureBoxAvatar.Image = circle;
+                        var src = Image.FromStream(ms);
+                        var circ = CropToCircle(src, pictureBoxAvatar.Width, this.BackColor);
+                        pictureBoxAvatar.Image = circ;
                     }
                 }
             }
@@ -296,18 +264,15 @@ namespace ScheduleISync
             }
         }
 
-        // Crop image to circle
         private Image CropToCircle(Image src, int size, Color backColor)
         {
-            Bitmap dst = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-            using (Graphics g = Graphics.FromImage(dst))
+            var dst = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            using (var g = Graphics.FromImage(dst))
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
-                using (SolidBrush brush = new SolidBrush(backColor))
-                {
-                    g.FillRectangle(brush, 0, 0, size, size);
-                }
-                using (GraphicsPath path = new GraphicsPath())
+                using (var b = new SolidBrush(backColor))
+                    g.FillRectangle(b, 0, 0, size, size);
+                using (var path = new GraphicsPath())
                 {
                     path.AddEllipse(0, 0, size, size);
                     g.SetClip(path);
@@ -317,27 +282,16 @@ namespace ScheduleISync
             return dst;
         }
 
-        // Extract folderId from a URL (e.g., https://drive.google.com/drive/folders/ABC123?usp=drive_link)
         private string GetFolderIdFromLink(string link)
         {
-            try
-            {
-                int index = link.IndexOf("/folders/");
-                if (index == -1)
-                    return null;
-                int start = index + "/folders/".Length;
-                int end = link.IndexOfAny(new char[] { '/', '?' }, start);
-                if (end == -1)
-                    return link.Substring(start);
-                return link.Substring(start, end - start);
-            }
-            catch
-            {
-                return null;
-            }
+            if (string.IsNullOrEmpty(link)) return null;
+            var idx = link.IndexOf("/folders/");
+            if (idx < 0) return null;
+            var start = idx + "/folders/".Length;
+            var end = link.IndexOfAny(new char[] { '/', '?' }, start);
+            return end < 0 ? link.Substring(start) : link.Substring(start, end - start);
         }
 
-        // Upload save file to Google Drive via API, with progress updates
         private async Task UploadSaveAsync()
         {
             try
@@ -352,26 +306,25 @@ namespace ScheduleISync
                     Log("Local save folder not found.");
                     return;
                 }
-                string folderLink = string.Empty;
-                this.Invoke(new Action(() => { folderLink = textBoxFolderLink.Text.Trim(); }));
+                string folderLink = textBoxFolderLink.Text.Trim();
                 string folderId = GetFolderIdFromLink(folderLink);
                 if (string.IsNullOrEmpty(folderId))
                 {
                     Log("Invalid shared folder URL.");
                     return;
                 }
-                string slot = string.Empty;
-                this.Invoke(new Action(() => { slot = comboBoxSlot.SelectedItem.ToString(); }));
-                string saveFolder = System.IO.Path.Combine(LocalSavesPath, slot);
+                string slot = comboBoxSlot.SelectedItem.ToString();
+                string saveFolder = Path.Combine(LocalSavesPath, slot);
                 if (!Directory.Exists(saveFolder))
                 {
                     Log($"Save folder '{saveFolder}' not found.");
                     return;
                 }
-                string zipFile = System.IO.Path.Combine(Path.GetTempPath(), slot + ".zip");
-                if (File.Exists(zipFile))
-                    File.Delete(zipFile);
+
+                string zipFile = Path.Combine(Path.GetTempPath(), slot + ".zip");
+                if (File.Exists(zipFile)) File.Delete(zipFile);
                 ZipFile.CreateFromDirectory(saveFolder, zipFile);
+
                 UpdateProgress("Uploading Save Files... 0%", 0);
                 Log("Uploading Save Files...");
                 Log("Upload time: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -403,6 +356,7 @@ namespace ScheduleISync
                     Log("Upload completed at " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                     Log("Save file uploaded. File ID: " + f.Id);
                 }
+
                 Thread.Sleep(1000);
                 UpdateProgress("", 0);
             }
@@ -412,65 +366,73 @@ namespace ScheduleISync
             }
         }
 
-        // Download save file using data from Google Sheet, with progress updates and folder existence check BEFORE downloading
         private async Task DownloadFromSheetAsync()
         {
             try
             {
-                // Get the Google Sheet URL from textBoxSheetLink
-                string sheetUrl = string.Empty;
-                this.Invoke(new Action(() => { sheetUrl = textBoxSheetLink.Text.Trim(); }));
+                string sheetUrl = textBoxSheetLink.Text.Trim();
                 if (string.IsNullOrEmpty(sheetUrl))
                 {
                     Log("Google Sheet URL not provided.");
                     return;
                 }
 
-                // Download CSV data from the sheet
-                string csvData = "";
-                using (WebClient wc = new WebClient())
-                {
+                string csvData;
+                using (var wc = new WebClient())
                     csvData = await wc.DownloadStringTaskAsync(sheetUrl);
-                }
+
                 if (string.IsNullOrEmpty(csvData))
                 {
                     Log("Failed to retrieve data from the sheet.");
                     return;
                 }
 
-                // Parse CSV using CsvHelper
                 List<FileRecord> records;
                 using (var reader = new StringReader(csvData))
                 using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
                 {
                     records = csv.GetRecords<FileRecord>().ToList();
                 }
+
                 if (records == null || records.Count == 0)
                 {
                     Log("No records found in the sheet.");
                     return;
                 }
 
-                // Select the record with the latest date
-                var latestRecord = records.OrderByDescending(r => DateTime.Parse(r.DateTime, CultureInfo.InvariantCulture)).First();
+                // Сортировка по дате
+                var latestRecord = records
+                  .OrderByDescending(r =>
+                  {
+                      if (DateTime.TryParseExact(
+                              r.DateTime,
+                              "dd.MM.yyyy HH:mm:ss",
+                              CultureInfo.InvariantCulture,
+                              DateTimeStyles.None,
+                              out var dt1))
+                          return dt1;
+                      if (DateTime.TryParse(
+                              r.DateTime,
+                              CultureInfo.CurrentCulture,
+                              DateTimeStyles.None,
+                              out var dt2))
+                          return dt2;
+                      return DateTime.MinValue;
+                  })
+                  .First();
+
                 Log("Downloading Save File from: " + latestRecord.DateTime);
 
-                // Determine local save folder BEFORE downloading
-                string saveFolder = string.Empty;
-                this.Invoke(new Action(() => { saveFolder = Path.Combine(LocalSavesPath, comboBoxSlot.SelectedItem.ToString()); }));
+                string slot = comboBoxSlot.SelectedItem.ToString();
+                string saveFolder = Path.Combine(LocalSavesPath, slot);
 
-                // Check if the save folder exists and prompt the user BEFORE downloading the file
                 if (Directory.Exists(saveFolder))
                 {
-                    DialogResult dr = DialogResult.None;
-                    this.Invoke(new Action(() =>
-                    {
-                        dr = MessageBox.Show(
-                            $"The slot {comboBoxSlot.SelectedItem} already contains save data. Do you really want to overwrite it? This action is irreversible.",
-                            "Confirm Overwrite",
-                            MessageBoxButtons.YesNo,
-                            MessageBoxIcon.Warning);
-                    }));
+                    var dr = MessageBox.Show(
+                        $"The slot {slot} already contains save data. Do you really want to overwrite it? This action is irreversible.",
+                        "Confirm Overwrite",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
                     if (dr == DialogResult.Yes)
                     {
                         Directory.Delete(saveFolder, true);
@@ -487,20 +449,18 @@ namespace ScheduleISync
                     Directory.CreateDirectory(saveFolder);
                 }
 
-                // Extract FILE_ID from DownloadURL
                 string fileId = ExtractFileIdFromUrl(latestRecord.DownloadURL);
                 if (string.IsNullOrEmpty(fileId))
                 {
                     Log("Failed to extract file ID from URL: " + latestRecord.DownloadURL);
                     return;
                 }
-                // Form direct download URL
+
                 string directDownloadUrl = $"https://drive.google.com/uc?export=download&id={fileId}";
                 Log("Direct download URL: " + directDownloadUrl);
 
-                // Download file with progress using WebClient
                 string tempZip = Path.Combine(Path.GetTempPath(), latestRecord.FileName);
-                using (WebClient wc = new WebClient())
+                using (var wc = new WebClient())
                 {
                     wc.DownloadProgressChanged += (s, e) =>
                     {
@@ -511,11 +471,9 @@ namespace ScheduleISync
                 Log("Download completed at " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                 UpdateProgress("", 0);
 
-                // Extract downloaded ZIP to the save folder
                 ZipFile.ExtractToDirectory(tempZip, saveFolder);
                 Log("Downloaded Save File applied.");
 
-                // Fix player folder configuration if needed
                 FixPlayerFolder(saveFolder);
             }
             catch (Exception ex)
@@ -524,9 +482,6 @@ namespace ScheduleISync
             }
         }
 
-        // Fix player folder configuration:
-        // Check Players\Player_0\Player.json for "PlayerCode" and adjust folder names if necessary.
-        // After adjustments, output a single message "Applied Player Configuration".
         private void FixPlayerFolder(string saveFolder)
         {
             try
@@ -553,7 +508,6 @@ namespace ScheduleISync
                 }
                 else
                 {
-                    // Rename folders as required
                     string newNameForPlayer0 = "Player_" + playerCode;
                     string newPathForPlayer0 = Path.Combine(playersFolder, newNameForPlayer0);
                     if (Directory.Exists(newPathForPlayer0))
@@ -562,9 +516,8 @@ namespace ScheduleISync
 
                     string targetFolder = Path.Combine(playersFolder, "Player_" + steamId);
                     if (Directory.Exists(targetFolder))
-                    {
                         Directory.Move(targetFolder, player0Folder);
-                    }
+
                     Log("Applied Player Configuration");
                 }
             }
@@ -574,19 +527,16 @@ namespace ScheduleISync
             }
         }
 
-        // Extract file ID from a URL of the form "https://drive.google.com/file/d/FILE_ID/view?usp=sharing"
         private string ExtractFileIdFromUrl(string url)
         {
             try
             {
                 string marker = "/d/";
                 int index = url.IndexOf(marker);
-                if (index == -1)
-                    return null;
+                if (index == -1) return null;
                 int start = index + marker.Length;
                 int end = url.IndexOf('/', start);
-                if (end == -1)
-                    end = url.Length;
+                if (end == -1) end = url.Length;
                 return url.Substring(start, end - start);
             }
             catch
@@ -594,25 +544,11 @@ namespace ScheduleISync
                 return null;
             }
         }
-
-        // AutoSync is disabled – synchronization is done manually via the "Download Save Files" button
-        private async Task AutoSyncAsync()
-        {
-            await Task.CompletedTask;
-        }
-
-        private async void SyncTimer_Tick(object sender, EventArgs e)
-        {
-            UpdateUIState();
-            await Task.CompletedTask;
-        }
     }
-
-    // Place these classes after MainForm
 
     public class AccountInfo
     {
-        public string StoreKey { get; set; }  // Key for FileDataStore
+        public string StoreKey { get; set; }
         public string Email { get; set; }
         public DriveService Service { get; set; }
         public string AvatarUrl { get; set; }
